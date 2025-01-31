@@ -2,10 +2,16 @@ import { Pool } from "pg";
 import { text } from "stream/consumers";
 
 const pool=new Pool({
-    user:"postgres",
+    // user:"postgres",
+    // host: "localhost",
+    // database:"postgres",
+    // password: "12345678",
+    // port:5432
+
+    user:"myuser",
     host: "localhost",
     database:"postgres",
-    password: "12345678",
+    password: "password",
     port:5432
 })
 
