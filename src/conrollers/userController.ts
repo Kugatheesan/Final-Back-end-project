@@ -30,6 +30,7 @@ export async function createUser(req:Request, res: Response) {
     const hashedPassword = await hashPassword(password)
 
     //save user to database
+    console.log(username, email, password)
     const savedUser = await saveUser(username,email,hashedPassword);
     res.status(201).send(savedUser)
 
@@ -45,7 +46,7 @@ interface User{
 
 //login page
 
-export async function loginuser(req:Request,res:Response){
+export async function signinuser(req:Request,res:Response){
     const {username:resUsername,password} = req.body;
 
     //get user from database
