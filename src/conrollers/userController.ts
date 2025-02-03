@@ -13,7 +13,7 @@ export async function createUser(req:Request, res: Response) {
 
     //if user name exists return 400
     if(isuserNameExists) {
-        res.status(400).send(" name already exists");
+        res.status(400).send("name already exists");
         return;
     }
 
@@ -33,7 +33,6 @@ export async function createUser(req:Request, res: Response) {
     console.log(username, email, password)
     const savedUser = await saveUser(username,email,hashedPassword);
     res.status(201).send(savedUser)
-
 }
 
 //User Interface

@@ -1,65 +1,41 @@
 import { Request, Response } from "express";
-import pool from "../database";
-
-// ✅ Get all services with categories
+import pool from '../database'
+// Get all services (without filtering)
 export const getAllServices = async (req: Request, res: Response) => {
     try {
-        const query = `
-            SELECT s.id, s.name, s.description, 
-                   json_agg(c.name) AS categories
-            FROM services s
-            LEFT JOIN service_categories sc ON s.id = sc.service_id
-            LEFT JOIN categories c ON sc.category_id = c.id
-            GROUP BY s.id;
-        `;
-        const result = await pool.query(query);
+        const result = await pool.query("SELECT * FROM services");
         res.json(result.rows);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
 };
+// Get services by category (corporate, family, television, etc.)
+export const getServicesByCategory = async (req: Request, res: Response): Promise<any> => {
+    const { category } = req.params;
 
-// ✅ Get services by category
-export const getServicesByCategory = async (req: Request, res: Response) => {
+    if (!category) {
+        return res.status(400).json({ message: "Category parameter is required" });
+    }
+
     try {
-        const { categoryName } = req.params;
-        const query = `
-            SELECT s.id, s.name, s.description,  
-                   json_agg(c.name) AS categories
-            FROM services s
-            JOIN service_categories sc ON s.id = sc.service_id
-            JOIN categories c ON sc.category_id = c.id
-            WHERE c.name = $1
-            GROUP BY s.id;
-        `;
-        const result = await pool.query(query, [categoryName]);
+        const result = await pool.query("SELECT * FROM services WHERE category = $1", [category]);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: `No services found for category: ${categoryName}` });
+            return res.status(404).json({ message: `No services found for category: ${category}` });
         }
 
-        res.json(result.rows);
+        return res.status(200).json(result.rows);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
+        console.error("Error fetching services by category:", error);
+        return res.status(500).json({ message: "Server error" });
     }
 };
-
-// ✅ Get a single service by ID
-export const getServiceById = async (req: Request, res: Response) => {
+// Get a single service by ID
+export const getServiceById = async (req: Request, res: Response):Promise<any> => {
     try {
         const { id } = req.params;
-        const query = `
-            SELECT s.id, s.name, s.description, 
-                   json_agg(c.name) AS categories
-            FROM services s
-            LEFT JOIN service_categories sc ON s.id = sc.service_id
-            LEFT JOIN categories c ON sc.category_id = c.id
-            WHERE s.id = $1
-            GROUP BY s.id;
-        `;
-        const result = await pool.query(query, [id]);
+        const result = await pool.query("SELECT * FROM services WHERE id = $1", [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Service not found" });
@@ -72,32 +48,15 @@ export const getServiceById = async (req: Request, res: Response) => {
     }
 };
 
-// ✅ Create a new service with multiple categories
+// Create a new service (with category)
 export const createService = async (req: Request, res: Response) => {
     try {
-        const { name, description, price, categories } = req.body; // Categories will be an array
-
-        // Insert into services table
-        const serviceResult = await pool.query(
-            "INSERT INTO services (name, description) VALUES ($1, $2) RETURNING id",
-            [name, description, price]
+        const { name, category, description, price } = req.body;
+        const result = await pool.query(
+            "INSERT INTO services (name, category, description) VALUES ($1, $2, $3) RETURNING *",
+            [name, category, description]
         );
-        const serviceId = serviceResult.rows[0].id;
-
-        // Insert categories and link them to the service
-        for (const category of categories) {
-            let categoryResult = await pool.query("SELECT id FROM categories WHERE name = $1", [category]);
-
-            // If category does not exist, create it
-            if (categoryResult.rows.length === 0) {
-                categoryResult = await pool.query("INSERT INTO categories (name) VALUES ($1) RETURNING id", [category]);
-            }
-
-            const categoryId = categoryResult.rows[0].id;
-            await pool.query("INSERT INTO service_categories (service_id, category_id) VALUES ($1, $2)", [serviceId, categoryId]);
-        }
-
-        res.status(201).json({ message: "Service created successfully!" });
+        res.status(201).json(result.rows[0]);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
