@@ -2,6 +2,8 @@ import  Express  from "express";
 import express from "express";
 import cors from 'cors';
 import router from "./router/userRouter";
+import routers from "./router/serviceRouter";
+ 
 
 const app = express();
 
@@ -19,6 +21,7 @@ app.use(express.json());
 
 // Use the router
 app.use('/api', router);
+app.use('/api',routers)
 
 // Start the server
 app.listen(3000, () => {

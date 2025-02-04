@@ -49,16 +49,16 @@ export const getServiceById = async (req: Request, res: Response):Promise<any> =
 };
 
 // Create a new service (with category)
-export const createService = async (req: Request, res: Response) => {
-    try {
-        const { name, category, description, price } = req.body;
-        const result = await pool.query(
-            "INSERT INTO services (name, category, description) VALUES ($1, $2, $3) RETURNING *",
-            [name, category, description]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
-    }
-};
+// export const createService = async (req: Request, res: Response) => {
+//     try {
+//         const { name, category, description, price } = req.body;
+//         const result = await pool.query(
+//             "INSERT INTO services (name, category, description) VALUES ($1, $2, $3) RETURNING *",
+//             [name, category, description]
+//         );
+//         res.status(201).json(result.rows[0]);
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: "Server error" });
+//     }
+// };
