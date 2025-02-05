@@ -1,5 +1,61 @@
 import { Request, Response } from "express";
 import pool from '../database'
+import { promises } from "dns";
+
+
+// not working
+
+export const getAllCategories = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const result = await pool.query("SELECT * FROM categories");
+
+        if (result.rows.length === 0) {
+            // Send the response without returning res
+            res.status(404).json({ message: "No categories found." });
+            return; // Just return here, no need to return res
+        }
+
+        // Send the result rows as JSON
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error("Error fetching categories:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+
+
+// Create a new category
+export const createCategory = async (req: Request, res: Response):Promise<any>  => {
+    try {
+        const { name, description, service_id } = req.body;
+
+        // Validate input
+        if (!name || !service_id) {
+            return res.status(400).json({ message: "Category name and service_id are required." });
+        }
+
+        // Check if the service_id exists in the services table
+        const serviceCheck = await pool.query("SELECT id FROM services WHERE id = $1", [service_id]);
+
+        if (serviceCheck.rows.length === 0) {
+            return res.status(400).json({ message: `Service with ID ${service_id} does not exist.` });
+        }
+
+        // Insert new category
+        const result = await pool.query(
+            "INSERT INTO categories (name, description, service_id) VALUES ($1, $2, $3) RETURNING *",
+            [name, description, service_id]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error("Error creating category:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+
 // Get all services (without filtering)
 export const getAllServices = async (req: Request, res: Response) => {
     try {
@@ -10,7 +66,8 @@ export const getAllServices = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Server error" });
     }
 };
-// Get services by category (corporate, family, television, etc.)
+
+// Get services by category (corporate, family, television, etc.) not working
 export const getServicesByCategory = async (req: Request, res: Response): Promise<any> => {
     const { category } = req.params;
 
@@ -31,6 +88,7 @@ export const getServicesByCategory = async (req: Request, res: Response): Promis
         return res.status(500).json({ message: "Server error" });
     }
 };
+
 // Get a single service by ID
 export const getServiceById = async (req: Request, res: Response):Promise<any> => {
     try {
@@ -49,16 +107,24 @@ export const getServiceById = async (req: Request, res: Response):Promise<any> =
 };
 
 // Create a new service (with category)
-// export const createService = async (req: Request, res: Response) => {
-//     try {
-//         const { name, category, description, price } = req.body;
-//         const result = await pool.query(
-//             "INSERT INTO services (name, category, description) VALUES ($1, $2, $3) RETURNING *",
-//             [name, category, description]
-//         );
-//         res.status(201).json(result.rows[0]);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ message: "Server error" });
-//     }
-// };
+// Create a new service
+export const createService = async (req: Request, res: Response):Promise<any> => {
+    try {
+        const { name } = req.body;
+
+        // Ensure the name is provided
+        if (!name) {
+            return res.status(400).json({ message: "Service name is required." });
+        }
+
+        const result = await pool.query(
+            "INSERT INTO services (name) VALUES ($1) RETURNING *",
+            [name]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error("Error creating service:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
