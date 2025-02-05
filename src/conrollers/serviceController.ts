@@ -23,8 +23,6 @@ export const getAllCategories = async (req: Request, res: Response): Promise<voi
     }
 };
 
-
-
 // Create a new category
 export const createCategory = async (req: Request, res: Response):Promise<any>  => {
     try {
@@ -54,7 +52,6 @@ export const createCategory = async (req: Request, res: Response):Promise<any>  
         res.status(500).json({ message: "Server error" });
     }
 };
-
 
 // Get all services (without filtering)
 export const getAllServices = async (req: Request, res: Response) => {
@@ -128,3 +125,128 @@ export const createService = async (req: Request, res: Response):Promise<any> =>
         res.status(500).json({ message: "Server error" });
     }
 };
+
+//editCaregoty
+export const editCategory = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { id } = req.params;
+        const { name, description, service_id } = req.body;
+
+        // Validate input
+        if (!id) {
+            return res.status(400).json({ message: "Category ID is required." });
+        }
+        if (!name || !service_id) {
+            return res.status(400).json({ message: "Category name and service_id are required." });
+        }
+
+        // Check if the category exists
+        const categoryCheck = await pool.query("SELECT id FROM categories WHERE id = $1", [id]);
+        if (categoryCheck.rows.length === 0) {
+            return res.status(404).json({ message: `Category with ID ${id} not found.` });
+        }
+
+        // Check if the service_id exists
+        const serviceCheck = await pool.query("SELECT id FROM services WHERE id = $1", [service_id]);
+        if (serviceCheck.rows.length === 0) {
+            return res.status(400).json({ message: `Service with ID ${service_id} does not exist.` });
+        }
+
+        // Update category
+        const result = await pool.query(
+            "UPDATE categories SET name = $1, description = $2, service_id = $3 WHERE id = $4 RETURNING *",
+            [name, description, service_id, id]
+        );
+
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error("Error updating category:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+//edit service
+export const editService = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { id } = req.params;
+        const { name, description } = req.body;
+
+        // Validate input
+        if (!id) {
+            return res.status(400).json({ message: "Service ID is required." });
+        }
+        if (!name) {
+            return res.status(400).json({ message: "Service name is required." });
+        }
+
+        // Check if the service exists
+        const serviceCheck = await pool.query("SELECT id FROM services WHERE id = $1", [id]);
+        if (serviceCheck.rows.length === 0) {
+            return res.status(404).json({ message: `Service with ID ${id} not found.` });
+        }
+
+        // Update service
+        const result = await pool.query(
+            "UPDATE services SET name = $1, description = $2 WHERE id = $3 RETURNING *",
+            [name, description, id]
+        );
+
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error("Error updating service:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+//delete service
+export const deleteService = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { id } = req.params;
+
+        // Validate input
+        if (!id) {
+            return res.status(400).json({ message: "Service ID is required." });
+        }
+
+        // Check if the service exists
+        const serviceCheck = await pool.query("SELECT id FROM services WHERE id = $1", [id]);
+        if (serviceCheck.rows.length === 0) {
+            return res.status(404).json({ message: `Service with ID ${id} not found.` });
+        }
+
+        // Delete service
+        await pool.query("DELETE FROM services WHERE id = $1", [id]);
+
+        res.status(200).json({ message: "Service deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting service:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+//delete category
+export const deleteCategory = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { id } = req.params;
+
+        // Validate input
+        if (!id) {
+            return res.status(400).json({ message: "Category ID is required." });
+        }
+
+        // Check if the category exists
+        const categoryCheck = await pool.query("SELECT id FROM categories WHERE id = $1", [id]);
+        if (categoryCheck.rows.length === 0) {
+            return res.status(404).json({ message: `Category with ID ${id} not found.` });
+        }
+
+        // Delete category
+        await pool.query("DELETE FROM categories WHERE id = $1", [id]);
+
+        res.status(200).json({ message: "Category deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting category:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+
