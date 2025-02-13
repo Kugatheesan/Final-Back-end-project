@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
-import pool from '../database'
+import {pool} from '../database'
 import { promises } from "dns";
 
 
-// not working
+// Done
 
-export const getAllCategories = async (req: Request, res: Response): Promise<void> => {
+export const getAllCategories = async (req: Request, res: Response)=> {
     try {
         const result = await pool.query("SELECT * FROM categories");
 
@@ -23,32 +23,79 @@ export const getAllCategories = async (req: Request, res: Response): Promise<voi
     }
 };
 
-// Create a new category
-export const createCategory = async (req: Request, res: Response):Promise<any>  => {
+// Create a new category 
+export const createCategory = async (req: Request, res: Response): Promise<any> => {
+    const categories = req.body;  // Array of categories
+
+    // Validate that the request body is an array
+    if (!Array.isArray(categories) || categories.length === 0) {
+        return res.status(400).json({ message: "Request body must be a non-empty array of categories." });
+    }
+
     try {
-        const { name, description, service_id } = req.body;
+        // Start a transaction to ensure data consistency
+        const client = await pool.connect();
+        await client.query('BEGIN');  // Begin transaction
 
-        // Validate input
-        if (!name || !service_id) {
-            return res.status(400).json({ message: "Category name and service_id are required." });
+        // Array to hold results after insertion
+        const insertedCategories = [];
+
+        for (const category of categories) {
+            const { name, description, service_id } = category;
+
+            // Validate each category input
+            if (!name || !service_id) {
+                await client.query('ROLLBACK');  // Rollback if validation fails
+                return res.status(400).json({ message: "Category name and service_id are required for all categories." });
+            }
+
+            // Check if the service_id exists in the services table
+            const serviceCheck = await client.query("SELECT id, name FROM services WHERE id = $1", [service_id]);
+
+            if (serviceCheck.rows.length === 0) {
+                await client.query('ROLLBACK');  // Rollback if service_id is invalid
+                return res.status(400).json({ message: `Service with ID ${service_id} does not exist.` });
+            }
+
+            // Insert category into the categories table
+            const result = await client.query(
+                "INSERT INTO categories (name, description, service_id) VALUES ($1, $2, $3) RETURNING *",
+                [name, description, service_id]
+            );
+
+            // Add the inserted category to the result array
+            insertedCategories.push(result.rows[0]);
         }
 
-        // Check if the service_id exists in the services table
-        const serviceCheck = await pool.query("SELECT id FROM services WHERE id = $1", [service_id]);
+        // Commit the transaction after all categories are successfully inserted
+        await client.query('COMMIT');
+        client.release();
 
-        if (serviceCheck.rows.length === 0) {
-            return res.status(400).json({ message: `Service with ID ${service_id} does not exist.` });
-        }
+        // Fetch the service details after category insertion
+        const service = insertedCategories.length > 0 
+            ? insertedCategories[0].service_id 
+            : null;
 
-        // Insert new category
-        const result = await pool.query(
-            "INSERT INTO categories (name, description, service_id) VALUES ($1, $2, $3) RETURNING *",
-            [name, description, service_id]
+        const serviceDetails = await pool.query(
+            "SELECT id, name FROM services WHERE id = $1",
+            [service]
         );
 
-        res.status(201).json(result.rows[0]);
+        if (serviceDetails.rows.length === 0) {
+            return res.status(404).json({ message: `Service with ID ${service} not found.` });
+        }
+
+        // Group response with service details and associated categories
+        const response = {
+            service: serviceDetails.rows[0],
+            categories: insertedCategories
+        };
+
+        // Return the response with service and categories
+        res.status(201).json(response);
+
     } catch (error) {
-        console.error("Error creating category:", error);
+        console.error("Error creating categories:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
@@ -64,27 +111,40 @@ export const getAllServices = async (req: Request, res: Response) => {
     }
 };
 
-// Get services by category (corporate, family, television, etc.) not working
-export const getServicesByCategory = async (req: Request, res: Response): Promise<any> => {
-    const { category } = req.params;
+// Get services by category (corporate, family, television)
+export const getServicesByServiceId = async (req: Request, res: Response): Promise<any> => {
+    const { serviceId } = req.params;  // Get serviceId from the URL parameter
 
-    if (!category) {
-        return res.status(400).json({ message: "Category parameter is required" });
+    if (!serviceId) {
+        return res.status(400).json({ message: "Service ID parameter is required" });
     }
 
     try {
-        const result = await pool.query("SELECT * FROM services WHERE category = $1", [category]);
+        // Step 1: Get services by service_id
+        const serviceResult = await pool.query("SELECT * FROM services WHERE id = $1", [serviceId]);
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: `No services found for category: ${category}` });
+        if (serviceResult.rows.length === 0) {
+            return res.status(404).json({ message: `Service with ID '${serviceId}' not found` });
         }
 
-        return res.status(200).json(result.rows);
+        // Step 2: Get all categories matching this service_id
+        const categoryResult = await pool.query(
+            "SELECT * FROM categories WHERE service_id = $1", 
+            [serviceId]
+        );
+
+        // Step 3: Return the service with all associated categories
+        return res.status(200).json({
+            service: serviceResult.rows[0], 
+            categories: categoryResult.rows // ✅ Return an array of categories
+        });
+
     } catch (error) {
-        console.error("Error fetching services by category:", error);
+        console.error("Error fetching service by ID:", error);
         return res.status(500).json({ message: "Server error" });
     }
 };
+
 
 // Get a single service by ID
 export const getServiceById = async (req: Request, res: Response):Promise<any> => {
@@ -158,12 +218,14 @@ export const editCategory = async (req: Request, res: Response): Promise<any> =>
             [name, description, service_id, id]
         );
 
-        res.status(200).json(result.rows[0]);
+        // Wrap the result in an array format
+        res.status(200).json([result.rows[0]]);
     } catch (error) {
         console.error("Error updating category:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
+
 
 //edit service
 export const editService = async (req: Request, res: Response): Promise<any> => {

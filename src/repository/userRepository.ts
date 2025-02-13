@@ -1,4 +1,4 @@
-import pool from "../database"
+import{ pool }from "../database"
 
 export const userNameExists = async (username: string) => {
     const { rows } = await pool.query ("SELECT email FROM public.users u where u.username = $1", [username]);
